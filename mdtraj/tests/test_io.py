@@ -21,6 +21,8 @@
 ##############################################################################
 
 import os
+import gzip
+import bz2
 import os.path
 import tables
 import tempfile
@@ -70,6 +72,44 @@ def test_overwrite_2():
         if os.path.exists(fn):
             os.close(fid)
             os.unlink(fn)
+
+
+class test_open_maybe_zipped(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def teardown(self):
+        for fn in glob.glob(os.path.join(self.tmpdir, '*')):
+            os.remove(fn)
+        os.rmdir(self.tmpdir)
+
+    def test_read_gz(self):
+        fn = os.path.join(self.tmpdir, 'read.gz')
+        with gzip.GzipFile(fn, 'w') as f:
+          f.write('COOKIE'.encode('utf-8'))
+        eq(io.open_maybe_zipped(fn, 'r').read(), u'COOKIE')
+
+    def test_write_gz(self):
+        fn = os.path.join(self.tmpdir, 'write.gz')
+        with io.open_maybe_zipped(fn, 'w') as f:
+            f.write('COOKIE')
+
+        with gzip.GzipFile(fn, 'r') as f:
+          eq(f.read().decode('utf-8'), u'COOKIE')
+
+    def test_read_bz2(self):
+        fn = os.path.join(self.tmpdir, 'read.bz2')
+        with bz2.BZ2File(fn, 'w') as f:
+          f.write('COOKIE'.encode('utf-8'))
+        eq(io.open_maybe_zipped(fn, 'r').read(), u'COOKIE')
+
+    def test_write_bz2(self):
+        fn = os.path.join(self.tmpdir, 'write.bz2')
+        with io.open_maybe_zipped(fn, 'w') as f:
+            f.write('COOKIE')
+
+        with bz2.BZ2File(fn, 'r') as f:
+          eq(f.read().decode('utf-8'), u'COOKIE')
 
 
 class test_io(unittest.TestCase):
