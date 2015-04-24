@@ -57,6 +57,9 @@ and ``mdtraj.io.saveh``, for loading and saving generic arrays to disk.
 These functions act like ``numpy.savez`` and ``numpy.loadz``, but use a
 PyTables HDF5 for superior performance and compression.
 
+It also provides open_maybe_zipped for selecting the correct reader based on the
+filename.
+
 Nothing in this module is specific to molecular dynamics trajectories.
 
 Examples
@@ -72,11 +75,13 @@ Functions
 ---------
 """
 from __future__ import print_function, division
+import bz2
+import gzip
 import os
 import warnings
 import numpy as np
 from mdtraj.utils import import_
-from mdtraj.utils.six import PY3, iteritems
+from mdtraj.utils.six import PY3, iteritems, StringIO
 if PY3:
     basestring = str
 tables = import_('tables')
@@ -283,6 +288,30 @@ def loadh(file, name=Ellipsis, deferred=True):
         return result
 
     return DeferredTable(handle, own_fid)
+
+
+def open_maybe_zipped(filename, mode, force_overwrite=True):
+    _, extension = os.path.splitext(filename.lower())
+    if mode == 'r':
+        if extension == '.gz':
+           with gzip.GzipFile(filename, 'r') as gz_f:
+               return StringIO(gz_f.read().decode('utf-8'))
+        elif extension == '.bz2':
+           with bz2.BZ2File(filename, 'r') as bz2_f:
+               return StringIO(bz2_f.read().decode('utf-8'))
+        else:
+            return open(filename, 'r')
+    elif mode == 'w':
+        if os.path.exists(filename) and not force_overwrite:
+            raise IOError('"%s" already exists' % filename)
+        if extension == '.gz':
+            return gzip.GzipFile(filename, 'w')
+        elif extension == '.bz2':
+            return bz2.BZ2File(filename, 'w')
+        else:
+            return open(filename, 'w')
+    else:
+        raise ValueError('Invalid mode "%s"' % mode)
 
 
 class DeferredTable(object):
