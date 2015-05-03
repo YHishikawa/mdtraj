@@ -55,6 +55,20 @@ static INLINE __m128 _mm_round_ps2(const __m128 a){
     return r;
 }
 
+static INLINE __m128 _mm_floor_ps2(const __m128& x){
+    /* http://dss.stephanierct.com/DevBlog/?p=8 */
+    __m128i v0 = _mm_setzero_si128();
+    __m128i v1 = _mm_cmpeq_epi32(v0,v0);
+    __m128i ji = _mm_srli_epi32( v1, 25);
+    __m128 slli = _mm_slli_epi32( ji, 23); //create vector 1.0f
+    __m128 j = *(__m128*)& slli;
+    __m128i i = _mm_cvttps_epi32(x);
+    __m128 fi = _mm_cvtepi32_ps(i);
+    __m128 igx = _mm_cmpgt_ps(fi, x);
+    j = _mm_and_ps(igx, j);
+    return _mm_sub_ps(fi, j);
+}
+
 
 static INLINE __m128 _mm_dp_ps2( __m128 a, __m128 b, const int mask ) {
     /*
