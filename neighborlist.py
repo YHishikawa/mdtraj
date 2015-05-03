@@ -35,9 +35,13 @@ class NeighborListBuilder(object):
         return idx
 
     def get_neighbors(self, x):
+        print('x.shape', x)
         center_idx = self.get_index(x)
         d_index = (self.max_distance / self.edge_lengths).astype(np.int) + 1
-        print(d_index)
+        print('center_idx', center_idx)
+        print('d_index', d_index)
+        neighbors = []
+
 
         for ix in range(center_idx[0] - d_index[0], center_idx[0] + d_index[0] + 1):
             ix = np.mod(ix, self.n_voxels[0])
@@ -45,17 +49,18 @@ class NeighborListBuilder(object):
                 iy = np.mod(iy, self.n_voxels[1])
                 for iz in range(center_idx[2] - d_index[2], center_idx[2] + d_index[2] + 1):
                     iz = np.mod(iz, self.n_voxels[2])
+                    # print('x=%d, y=%d, z=%d' % (ix, iy, iz))
 
                     indx = (int(ix), int(iy), int(iz))
-                    #print(indx, self.n_voxels)
-
                     if indx in self.voxels:
+                        # print("HELLO")
                         voxel_j = self.voxels[indx]
                         for atom_j in voxel_j:
                             d = self.get_distance(x, atom_j[1])
                             if 0 < d < self.max_distance:
 
-                                print('neighbors', x, atom_j[1])
+                                neighbors.append((atom_j[0], d**2))
+        return neighbors
 
     def get_neighbors_naive(self, x):
         for y in (atom[1] for voxel in self.voxels.values() for atom in voxel):
@@ -85,16 +90,20 @@ def main():
         [4.9, 4.9, 9.9],
     ])
 
-    builder = NeighborListBuilder(unitcell, 1.5)
+    builder = NeighborListBuilder(unitcell, 2.5)
     for i, x in enumerate(positions):
         builder.add_location(i, x)
 
-    for i, x in enumerate(positions):
-        builder.get_neighbors(x)
 
-    print()
-    for i, x in enumerate(positions):
-        builder.get_neighbors_naive(x)
+    # print('s', np.dot(builder.unitcell_inverse, positions.T).T)
+    print(builder.get_neighbors(positions[0]))
+
+    # for i, x in enumerate(positions):
+#         builder.get_neighbors(x)
+#
+#     print()
+#     for i, x in enumerate(positions):
+#         builder.get_neighbors_naive(x)
     # print(builder.voxels)
     # print((1,2,3) in builder.voxels)
 
