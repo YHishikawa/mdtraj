@@ -45,6 +45,8 @@ private:
     const Unitcell unitcell_;
     fvec4 unitcell_vectors_[3];
     fvec4 unitcell_lengths_;
+    int nx_, ny_, nz_;
+    int d_index_[4];
     ivec4 n_voxels_;
     fvec4 voxel_size_;
     fvec4 voxel_size_r_;
@@ -71,14 +73,18 @@ NeighborList::NeighborList(float max_distance, size_t n_atoms, const float* posi
         sqrt(dot3(unitcell_vectors_[2], unitcell_vectors_[2])),
         0.0);
 
-    n_voxels_ = floor(unitcell_lengths_ / max_distance);
+    n_voxels_ = floor(unitcell_lengths_ / (2*max_distance));
     voxel_size_ = unitcell_lengths_ / n_voxels_;
     voxel_size_r_ = unitcell_.to_recip(voxel_size_);
 
     int n[4];
     n_voxels_.store(n);
-    int vox_intex_mult[4] = {n[0]*n[1]*n[2], n[1]*n[2], n[2], 0};
-    vox_intex_mult_ = ivec4(vox_intex_mult);
+    nx_ = n[0];
+    ny_ = n[1];
+    nz_ = n[2];
+
+    ivec4 d_index = floor(max_distance_ / voxel_size_) + 1;
+    d_index.store(d_index_);
 
     positions_r_ = static_cast<float*>(calloc(n_atoms * 4, sizeof(float)));
     loadPositions(positions);
@@ -146,89 +152,86 @@ ivec4 NeighborList::getVoxelIndexVector(const fvec4& s) const {
 }
 
 size_t NeighborList::getVoxelIndex(const fvec4& s) const {
+    int result[4];
     ivec4 voxelIndexVector = getVoxelIndexVector(s);
-    return sum(voxelIndexVector * vox_intex_mult_);
+    voxelIndexVector.store(result);
+    return result[0]*nx_*ny_ + result[1]*ny_ + result[2];
 }
 
-size_t NeighborList::getVoxelIndex(int nx, int ny, int nz) const {
-    ivec4 voxelIndexVector(nx, ny, nz, 0);
-    return sum(voxelIndexVector * vox_intex_mult_);
+size_t NeighborList::getVoxelIndex(int x, int y, int z) const {
+    return x*nx_*ny_ + y*ny_ + z;
 }
 
 void NeighborList::getNeighborsNaive(size_t i, std::vector<AtomPair>& neighbors) const {
     fvec4 si(positions_r_ + 4*i);
+    // int n_dist_calc = 0;
     for (size_t j = i+1; j < n_atoms_; j++) {
         fvec4 sj(positions_r_ + 4*j);
         fvec4 s12 = si - sj;
         fvec4 r12 = unitcell_.from_recip(s12 - round(s12));
         float d2 = dot3(r12, r12);
+        // n_dist_calc += 1;
 
         if ((d2 > 0) && (d2 < max_distance2_)) {
             AtomPair pair = {i, j, d2};
             neighbors.push_back(pair);
         }
     }
+    // printf("n_dist_calc (naive): %d\n", n_dist_calc);
 }
 
+// void NeighborList::getNeighbors(size_t voxelIndex, std::vector<AtomPair>& neighbors) const {
+//
+// }
+
 void NeighborList::getNeighbors(size_t i, std::vector<AtomPair>& neighbors) const {
-    fvec4 s(positions_r_ + 4*i);
-    int center_idx[4];
-    getVoxelIndexVector(s).store(center_idx);
+    fvec4 si(positions_r_ + 4*i);
+    int center_index[4];
+    getVoxelIndexVector(si).store(center_index);
 
-
-    int d_idx[4];
-    int n_vox[4];
-    ivec4 d_index = floor(max_distance_ / voxel_size_) + 1;
-    d_index.store(d_idx);
-    n_voxels_.store(n_vox);
-
-    int minx = center_idx[0] - d_idx[0];
-    int maxx = center_idx[0] + d_idx[0];
-    int miny = center_idx[1] - d_idx[1];
-    int maxy = center_idx[1] + d_idx[1];
-    int minz = center_idx[2] - d_idx[2];
-    int maxz = center_idx[2] + d_idx[2];
-    std::set<size_t> visitedVoxels;
+    int minx = center_index[0] - d_index_[0];
+    int maxx = center_index[0] + d_index_[0];
+    int miny = center_index[1] - d_index_[1];
+    int maxy = center_index[1] + d_index_[1];
+    int minz = center_index[2] - d_index_[2];
+    int maxz = center_index[2] + d_index_[2];
 
     for (int ix = minx; ix <= maxx; ix++) {
-        int x = imod(ix, n_vox[0]);
+        int x = (ix < 0 ? ix+nx_ : (ix >= nx_ ? ix-nx_ : ix));
 
         for (int iy = miny; iy <= maxy; iy++) {
-            int y = imod(iy, n_vox[1]);
+            int y =  (iy < 0 ? iy+ny_ : (iy >= ny_ ? iy-ny_ : iy));
 
             for (int iz = minz; iz <= maxz; iz++) {
-                int z = imod(iz, n_vox[2]);
+                int z = (iz < 0 ? iz+nz_ : (iz >= nz_ ? iz-nz_ : iz));
 
                 size_t voxelIndex = getVoxelIndex(x, y, z);
-                if (visitedVoxels.find(voxelIndex) != visitedVoxels.end())
-                    continue;
-                visitedVoxels.insert(voxelIndex);
-                // printf("  x=%d, y=%d, z=%d\n", x, y, z);
-
                 const std::map<size_t, std::vector<size_t> >::const_iterator voxelEntry = voxelMap_.find(voxelIndex);
-                if (voxelEntry == voxelMap_.end()) continue; // no such voxel; skip
-                const std::vector<size_t>& voxel = voxelEntry->second;
+                if (voxelEntry == voxelMap_.end()) {
+                     continue; // no such voxel; skip
+                }
 
+                const std::vector<size_t>& voxel = voxelEntry->second;
                 for (size_t j = 0; j < voxel.size(); j++) {
                     size_t atom_j = voxel[j];
-
                     // only count pairs of the form (i,j) with j > i
                     if (atom_j <= i)
                         continue;
 
                     fvec4 sj(positions_r_ + 4*atom_j);
-                    fvec4 s12 = s - sj;
+                    fvec4 s12 = si - sj;
                     fvec4 r12 = unitcell_.from_recip(s12 - round(s12));
-                    float d2 = dot3(r12, r12);
+                    float d2 = dot4(r12, r12);
                     if ((d2 > 0) && (d2 < max_distance2_)) {
-                        AtomPair pair = {i, j, d2};
+                        AtomPair pair = {i, atom_j, d2};
                         neighbors.push_back(pair);
                     }
                 }
-
             }
         }
     }
+
+    //
     // return
 }
 

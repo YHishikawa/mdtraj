@@ -19,6 +19,7 @@ cdef extern from "NeighborList.hpp" namespace "MDTraj":
 cdef class NeighborList:
     cdef CNeighborList *thisptr
     cdef float[:, ::1] positions
+    cdef size_t n_atoms
 
     def __cinit__(self, float max_distance, float[:, ::1] positions, unitcell_vectors):
         cdef size_t n_atoms = positions.shape[0]
@@ -29,6 +30,7 @@ cdef class NeighborList:
         if not (cell_vectors.shape[0] == cell_vectors.shape[0] == 3):
             raise ValueError('unitcell vectors must hav shape (3, 3)')
 
+        self.n_atoms = n_atoms
         self.positions = positions  # incremenet the refcount
         with nogil:
             self.thisptr = new CNeighborList(max_distance, n_atoms, &positions[0,0], &cell_vectors[0,0])
@@ -54,7 +56,25 @@ cdef class NeighborList:
             pairs[j, 0] = neighbors[j].i
             pairs[j, 1] = neighbors[j].j
             distance[j] = sqrtf(neighbors[j].d2)
+        return np.asarray(pairs), np.asarray(distance)
 
-        sort_index = np.argsort(distance)
-        return np.asarray(pairs)[sort_index], np.asarray(distance)[sort_index]
+    def all_neighbors(self, naive=False):
+        cdef size_t i
+        cdef vector[AtomPair] neighbors
+        if naive:
+            with nogil:
+                for i in range(self.n_atoms):
+                    self.thisptr.getNeighborsNaive(i, neighbors)
+        else:
+            with nogil:
+                for i in range(self.n_atoms):
+                    self.thisptr.getNeighbors(i, neighbors)
 
+        size = neighbors.size()
+        cdef int64_t[:, ::1] pairs = np.zeros((size, 2), dtype=np.int64)
+        cdef float[::1] distance = np.zeros(size, dtype=np.float32)
+        for j in range(size):
+            pairs[j, 0] = neighbors[j].i
+            pairs[j, 1] = neighbors[j].j
+            distance[j] = sqrtf(neighbors[j].d2)
+        return np.asarray(pairs), np.asarray(distance)
