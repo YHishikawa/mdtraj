@@ -215,6 +215,12 @@ def geometry_extensions():
             define_macros=define_macros,
             extra_compile_args=compiler_args,
             language='c++'),
+        Extension('mdtraj.geometry.neighborlist',
+            sources=["mdtraj/geometry/neighborlist.pyx",],
+            include_dirs=["mdtraj/geometry/include", "mdtraj/rmsd/include"],
+            define_macros=define_macros,
+            extra_compile_args=compiler_args,
+            language='c++'),
         ]
 
 extensions = [xtc, trr, dcd, binpos, dtr]

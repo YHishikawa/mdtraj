@@ -10,6 +10,8 @@
 #include <cstdlib>
 #include "util.h"
 
+namespace MDTraj {
+
 static INLINE int imod(int i, int n) {
     return (i > 0 ? i : i + n) % n;
 }
@@ -18,9 +20,9 @@ static INLINE int imod(int i, int n) {
 class AtomPair {
 public:
     AtomPair(size_t i_, size_t j_, float d2_) : i(i_), j(j_), d2(d2_) {};
-    const size_t i;
-    const size_t j;
-    const float d2;
+    size_t i;
+    size_t j;
+    float d2;
 };
 
 class NeighborList {
@@ -28,7 +30,7 @@ public:
     NeighborList(float max_distance, size_t n_atoms, const float* positions, const float unitcell_vectors[9]);
     ~NeighborList();
     void getNeighbors(size_t i, std::vector<AtomPair>& neighbors) const;
-
+    void getNeighborsNaive(size_t i, std::vector<AtomPair>& neighbors) const;
 
 private:
     void loadPositions(const float* positions);
@@ -45,7 +47,6 @@ private:
     const Unitcell unitcell_;
     fvec4 unitcell_vectors_[3];
     fvec4 unitcell_lengths_;
-    // fvec4 n_voxels_;
     ivec4 n_voxels_;
     fvec4 voxel_size_;
     fvec4 voxel_size_r_;
@@ -156,6 +157,21 @@ size_t NeighborList::getVoxelIndex(int nx, int ny, int nz) const {
     return sum(voxelIndexVector * vox_intex_mult_);
 }
 
+void NeighborList::getNeighborsNaive(size_t i, std::vector<AtomPair>& neighbors) const {
+    fvec4 si(positions_r_ + 4*i);
+    for (size_t j = i+1; j < n_atoms_; j++) {
+        fvec4 sj(positions_r_ + 4*j);
+        fvec4 s12 = si - sj;
+        fvec4 r12 = unitcell_.from_recip(s12 - round(s12));
+        float d2 = dot3(r12, r12);
+
+        if ((d2 > 0) && (d2 < max_distance2_)) {
+            AtomPair pair(i, j, d2);
+            neighbors.push_back(pair);
+        }
+    }
+}
+
 void NeighborList::getNeighbors(size_t i, std::vector<AtomPair>& neighbors) const {
     fvec4 s(positions_r_ + 4*i);
     int center_idx[4];
@@ -197,6 +213,11 @@ void NeighborList::getNeighbors(size_t i, std::vector<AtomPair>& neighbors) cons
 
                 for (size_t j = 0; j < voxel.size(); j++) {
                     size_t atom_j = voxel[j];
+
+                    // only count pairs of the form (i,j) with j > i
+                    if (atom_j <= i)
+                        continue;
+
                     fvec4 sj(positions_r_ + 4*atom_j);
                     fvec4 s12 = s - sj;
                     fvec4 r12 = unitcell_.from_recip(s12 - round(s12));
@@ -212,5 +233,7 @@ void NeighborList::getNeighbors(size_t i, std::vector<AtomPair>& neighbors) cons
     }
     // return
 }
+
+} // namespace
 
 #endif
