@@ -16,14 +16,12 @@ static INLINE int imod(int i, int n) {
     return (i > 0 ? i : i + n) % n;
 }
 
-
-class AtomPair {
-public:
-    AtomPair(size_t i_, size_t j_, float d2_) : i(i_), j(j_), d2(d2_) {};
+struct AtomPair {
     size_t i;
     size_t j;
     float d2;
 };
+
 
 class NeighborList {
 public:
@@ -166,7 +164,7 @@ void NeighborList::getNeighborsNaive(size_t i, std::vector<AtomPair>& neighbors)
         float d2 = dot3(r12, r12);
 
         if ((d2 > 0) && (d2 < max_distance2_)) {
-            AtomPair pair(i, j, d2);
+            AtomPair pair = {i, j, d2};
             neighbors.push_back(pair);
         }
     }
@@ -223,7 +221,7 @@ void NeighborList::getNeighbors(size_t i, std::vector<AtomPair>& neighbors) cons
                     fvec4 r12 = unitcell_.from_recip(s12 - round(s12));
                     float d2 = dot3(r12, r12);
                     if ((d2 > 0) && (d2 < max_distance2_)) {
-                        AtomPair pair(i, atom_j, d2);
+                        AtomPair pair = {i, j, d2};
                         neighbors.push_back(pair);
                     }
                 }

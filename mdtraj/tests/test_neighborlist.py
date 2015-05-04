@@ -5,7 +5,7 @@ random = np.random.RandomState(0)
 def test_1():
     unitcell = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
     positions = random.rand(20, 3).astype(np.float32)
-    cutoff = 0.2
+    cutoff = 0.5
 
     neighborlist = NeighborList(cutoff, positions, unitcell)
 
