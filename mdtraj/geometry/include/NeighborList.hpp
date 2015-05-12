@@ -76,6 +76,9 @@ NeighborList::NeighborList(float max_distance, size_t n_atoms, const float* posi
     n_voxels_ = floor(unitcell_lengths_ / (2*max_distance));
     voxel_size_ = unitcell_lengths_ / n_voxels_;
     voxel_size_r_ = unitcell_.to_recip(voxel_size_);
+    printf("unitcell_lengths_:  ");
+    unitcell_lengths_.print();
+    printf("Max distance: %.3f\n", max_distance);
 
     int n[4];
     n_voxels_.store(n);
@@ -90,6 +93,22 @@ NeighborList::NeighborList(float max_distance, size_t n_atoms, const float* posi
     loadPositions(positions);
     for (size_t i = 0; i < n_atoms_; i++)
         addLocation(i);
+
+
+    printf("d_index  ");
+    d_index.print();
+
+    std::map<size_t, std::vector<size_t> >::iterator it;
+    for (size_t i = 0; i < n_atoms_; i++) {
+        fvec4 s(positions_r_ + 4*i);
+        ivec4 index = getVoxelIndexVector(s);
+        printf("VoxelIndex Vector  ");
+        index.print();
+    }
+
+    for (it = voxelMap_.begin(); it != voxelMap_.end(); it++) {
+        printf("voxelIndex: %lu\n", it->first);
+    }
 }
 
 
@@ -205,6 +224,7 @@ void NeighborList::getNeighbors(size_t i, std::vector<AtomPair>& neighbors) cons
             for (int iz = minz; iz <= maxz; iz++) {
                 int z = (iz < 0 ? iz+nz_ : (iz >= nz_ ? iz-nz_ : iz));
 
+                printf("Searching (%d, %d, %d)\n", x, y, z);
                 size_t voxelIndex = getVoxelIndex(x, y, z);
                 const std::map<size_t, std::vector<size_t> >::const_iterator voxelEntry = voxelMap_.find(voxelIndex);
                 if (voxelEntry == voxelMap_.end()) {
