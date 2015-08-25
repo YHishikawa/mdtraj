@@ -174,8 +174,8 @@ def test_binpos():
 
 def test_load():
     filenames = ["frame0.xtc", "frame0.trr", "frame0.dcd", "frame0.binpos",
-                 "traj.h5", 'legacy_msmbuilder_trj0.lh5', 'frame0.nc', six.u('traj.h5'),
-                 "frame0.lammpstrj", "frame0.xyz"]
+                 "traj.h5", "frame0.nc", "traj.h5", "frame0.lammpstrj",
+                 "frame0.xyz"]
     num_block = 3
     for filename in filenames:
         t0 = md.load(get_fn(filename), top=nat, discard_overlapping_frames=True)
@@ -183,8 +183,9 @@ def test_load():
         t2 = md.load([get_fn(filename) for i in xrange(num_block)], top=nat, discard_overlapping_frames=False)
         t3 = md.load([get_fn(filename) for i in xrange(num_block)], top=nat, discard_overlapping_frames=True)
 
-        # these don't actually overlap, so discard_overlapping_frames should have no effect
-        # the overlap is between the last frame of one and the first frame of the next.
+        # these don't actually overlap, so discard_overlapping_frames should
+        # have no effect. the overlap is between the last frame of one and the
+        # first frame of the next.
         yield lambda: eq(t0.n_frames, t1.n_frames)
         yield lambda: eq(t0.n_frames * num_block, t2.n_frames)
         yield lambda: eq(t3.n_frames, t2.n_frames)
